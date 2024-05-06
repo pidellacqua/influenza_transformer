@@ -5,6 +5,59 @@ Code for running inference with transformer
 import torch.nn as nn 
 import torch
 import utils
+from torch.utils.data import DataLoader
+
+def train_encoder_decoder(
+     model: nn.Module, 
+     train_loader: DataLoader,
+     epochs: int,
+     forecast_window: int,
+     enc_seq_len: int,
+     batch_first: bool
+
+):
+    optimizer = torch.optim.Adam()
+
+    criterion = torch.nn.MSELoss()
+    
+    # Iterate over all epochs
+    for epoch in range(epochs):
+
+        running_loss = 0.
+        last_loss = 0.
+
+        # Iterate over all (x,y) pairs in training dataloader
+        for i, (src, tgt, tgt_y) in enumerate(train_loader):
+
+            # zero the parameter gradients
+            optimizer.zero_grad()
+
+            # Generate masks
+            tgt_mask = utils.generate_square_subsequent_mask(
+                dim1=forecast_window,
+                dim2=forecast_window
+                )
+
+            src_mask = utils.generate_square_subsequent_mask(
+                dim1=forecast_window,
+                dim2=enc_seq_len
+                )
+
+            # Make forecasts
+            prediction = model(src, tgt, src_mask, tgt_mask)
+
+            # Compute and backprop loss
+            loss = criterion(tgt_y, prediction)
+
+            loss.backward()
+
+            # Take optimizer step
+            optimizer.step()
+
+            running_loss +=  loss.item()
+
+        last_loss = running_loss / len(train_loader)
+        #Log.info(f"Training: Epoch {epoch + 1}/{epochs}, Loss: {last_loss}")
 
 def run_encoder_decoder_inference(
     model: nn.Module, 
